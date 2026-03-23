@@ -538,7 +538,7 @@
 
   <!-- ── Header ── -->
   <header>
-    <div class="logo">TyCo Bookmarks</div>
+    <div class="logo"> Bookmarks</div>
     <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
     <div class="header-right">
       <span id="clock">00:00:00</span>
@@ -659,7 +659,7 @@
   <div class="overlay" id="name-overlay">
     <div class="modal">
       <div class="modal-hdr">
-        <div class="modal-title">Welcome to TyCo Bookmarks</div>
+        <div class="modal-title">Welcome to  Bookmarks</div>
       </div>
       <p class="modal-sub">What should we call you? We'll save your name for future visits.</p>
       <input class="mfield" id="name-input" type="text" placeholder="Your name" maxlength="40" autocomplete="given-name">
@@ -682,10 +682,10 @@
 
   <script>
   /* ================================================================
-     TyCo Bookmarks — Production JS
+      Bookmarks — Production JS
      All localStorage keys:
-       tyco_name       → user's display name (string)
-       tyco_bm_v3      → bookmarks JSON array
+       _name       → user's display name (string)
+       _bm_v3      → bookmarks JSON array
   ================================================================ */
 
   // ── Utils ────────────────────────────────────────────────────────
@@ -711,7 +711,7 @@
 
   // ── Name / greeting ──────────────────────────────────────────────
 
-  const NAME_KEY = 'tyco_name';
+  const NAME_KEY = '_name';
 
   function getGreeting() {
     const h = new Date().getHours();
@@ -772,10 +772,10 @@
 
   // ── Bookmarks data ───────────────────────────────────────────────
 
-  const BM_KEY = 'tyco_bm_v3';
+  const BM_KEY = '_bm_v3';
 
   const DEFAULTS = [
-    { name: 'TyCo',           url: 'https://sites.google.com/view/tyco-me/home' },
+    { name: 'TyCo',           url: 'https://tycoinnovations.github.io/' },
     { name: 'Google',         url: 'https://www.google.com' },
     { name: 'YouTube',        url: 'https://www.youtube.com' },
     { name: 'GitHub',         url: 'https://github.com' },
