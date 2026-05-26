@@ -189,6 +189,23 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    .bookmark.style-rounded { border-radius: 14px; }
+    .bookmark.style-square { border-radius: 2px; }
+    .bookmark.style-tab {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 8px 10px;
+      gap: 8px;
+      border-radius: 9px 9px 0 0;
+      min-height: 44px;
+    }
+    .bookmark.style-tab .bm-label {
+      text-align: left;
+      white-space: nowrap;
+      max-width: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
     .bookmark.style-square { border-radius: 6px; }
     .bookmark.style-tab {
       border-radius: 10px 10px 5px 5px;
@@ -280,6 +297,16 @@
     .tile-edit:hover { background: #2563eb; }
     .tile-move:hover { background: #475569; }
     .bookmark.edit-mode { animation: wiggle 0.2s ease-in-out infinite alternate; }
+    .bookmark.drag-ready {
+      outline: 2px dashed rgba(59,130,246,0.75);
+      animation: none;
+      cursor: grab;
+    }
+    .bookmark.dragging {
+      opacity: 0.45;
+      transform: scale(0.97);
+      animation: none;
+    }
     @keyframes wiggle {
       from { transform: rotate(-1deg); }
       to   { transform: rotate(1deg); }
@@ -736,6 +763,9 @@
         <div class="modal-title">Settings</div>
         <button class="modal-x" id="settings-close" aria-label="Close">✕</button>
       </div>
+      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
+      <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
+      <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
       <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Dark</option><option value="light">Light</option></select></div>
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
@@ -753,6 +783,10 @@
       </div>
       <input class="mfield" id="bm-name" type="text" placeholder="Name  (e.g. GitHub)" maxlength="40" autocomplete="off">
       <input class="mfield" id="bm-url"  type="url"  placeholder="URL  (e.g. https://github.com)" autocomplete="off">
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <label for="bm-icon-upload" id="bm-icon-preview" style="width:64px;height:64px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:0.68rem;overflow:hidden;">Optional icon</label>
+        <input id="bm-icon-upload" type="file" accept="image/*" style="display:none;">
+      </div>
       <button class="mbtn" id="bm-add">Add Bookmark</button>
     </div>
   </div>
@@ -773,6 +807,20 @@
 
   function lsSet(key, val) {
     try { localStorage.setItem(key, val); } catch(e) {}
+  }
+  function setCookie(name, value, days) {
+    const d = new Date();
+    d.setTime(d.getTime() + (days*24*60*60*1000));
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+  }
+  function getCookie(name) {
+    const key = name + '=';
+    const parts = document.cookie.split(';');
+    for (let p of parts) {
+      p = p.trim();
+      if (p.indexOf(key) === 0) return decodeURIComponent(p.substring(key.length));
+    }
+    return '';
   }
 
   function normaliseUrl(raw) {
@@ -886,6 +934,9 @@
 
   let bookmarks = loadBM();
   let editingIndex = -1;
+  let dragIndex = -1;
+  const ICON_KEY = '_bm_icons_v1';
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
   const ICON_KEY = '_bm_icons_v1';
   const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true };
   let isEditMode = false;
@@ -907,6 +958,20 @@
   let settings = loadSettings();
   function saveSettings() { lsSet(SETTINGS_KEY, JSON.stringify(settings)); }
   function applyTheme() {
+    const t = {
+      dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
+      dusk:    { bg:'#12131c', surface:'#1a1d2b', s2:'#23283a', text:'#e8ebff', muted:'#939aba', border:'rgba(179,166,255,0.16)' },
+      forest:  { bg:'#0f1615', surface:'#162321', s2:'#1f2f2c', text:'#e8f3ef', muted:'#89a49d', border:'rgba(99,179,147,0.2)' },
+      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' }
+    }[settings.theme] || null;
+    if (!t) return;
+    document.documentElement.style.setProperty('--bg', t.bg);
+    document.documentElement.style.setProperty('--surface', t.surface);
+    document.documentElement.style.setProperty('--s2', t.s2);
+    document.documentElement.style.setProperty('--text', t.text);
+    document.documentElement.style.setProperty('--muted', t.muted);
+    document.documentElement.style.setProperty('--border', t.border);
+    document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
     if (settings.theme === 'light') {
       document.documentElement.style.setProperty('--bg', '#f4f6fc');
       document.documentElement.style.setProperty('--surface', '#ffffff');
@@ -1016,6 +1081,42 @@
       const up = document.createElement('button');
       up.className = 'tile-action tile-move';
       up.textContent = '↕';
+      up.title = 'Enable drag to move';
+      up.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dragIndex = (dragIndex === i) ? -1 : i;
+        renderBM();
+      });
+      if (isEditMode) a.classList.add('edit-mode');
+      if (dragIndex === i) {
+        a.classList.add('drag-ready');
+        a.setAttribute('draggable', 'true');
+      }
+      a.addEventListener('dragstart', function(e) {
+        if (dragIndex !== i) { e.preventDefault(); return; }
+        a.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(i));
+      });
+      a.addEventListener('dragend', function() { a.classList.remove('dragging'); });
+      a.addEventListener('dragover', function(e) {
+        if (dragIndex < 0 || dragIndex === i) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      a.addEventListener('drop', function(e) {
+        if (dragIndex < 0) return;
+        e.preventDefault();
+        const from = dragIndex;
+        const to = i;
+        if (from === to) return;
+        const moved = bookmarks.splice(from, 1)[0];
+        bookmarks.splice(to, 0, moved);
+        dragIndex = to;
+        saveBM();
+        renderBM();
+      });
       up.title = 'Move bookmark';
       up.addEventListener('click', function(e) {
         e.preventDefault(); e.stopPropagation(); openEditModal(i);
@@ -1046,10 +1147,16 @@
   const bmNameEl  = document.getElementById('bm-name');
   const bmUrlEl   = document.getElementById('bm-url');
   const bmAdd     = document.getElementById('bm-add');
+  const bmIconUpload = document.getElementById('bm-icon-upload');
+  const bmIconPreview = document.getElementById('bm-icon-preview');
+  let newIconData = '';
 
   function openBmModal() {
     bmNameEl.value = '';
     bmUrlEl.value  = '';
+    newIconData = '';
+    bmIconUpload.value = '';
+    bmIconPreview.innerHTML = 'Optional icon';
     bmOverlay.classList.add('open');
     bmNameEl.focus();
   }
@@ -1073,6 +1180,10 @@
       return;
     }
     bookmarks.push({ name, url });
+    if (newIconData) {
+      bookmarkIcons[url] = newIconData;
+      saveIcons();
+    }
     saveBM();
     renderBM();
     closeBmModal();
@@ -1085,6 +1196,16 @@
   // Enter key on name field moves to URL
   bmNameEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') bmUrlEl.focus();
+  });
+  bmIconUpload.addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+      newIconData = String(reader.result || '');
+      bmIconPreview.innerHTML = '<img src="' + newIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    reader.readAsDataURL(file);
   });
 
   const editOverlay = document.getElementById('edit-overlay');
@@ -1151,11 +1272,18 @@
 
   // ── Search ───────────────────────────────────────────────────────
 
-  const SEARCH_BASE = 'https://www.startpage.com/do/search?q=';
+  // ── Search ───────────────────────────────────────────────────────
 
   function searchFor(q) {
     if (!q) return;
-    window.open(SEARCH_BASE + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
+    const engines = {
+      google: 'https://www.google.com/search?q=',
+      bing: 'https://www.bing.com/search?q=',
+      duckduckgo: 'https://duckduckgo.com/?q=',
+      startpage: 'https://www.startpage.com/do/search?q='
+    };
+    const base = engines[settings.searchEngine] || engines.google;
+    window.open(base + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
   }
 
   // tag buttons
@@ -1215,6 +1343,7 @@
   document.getElementById('open-settings').addEventListener('click', function() {
     document.getElementById('theme-select').value = settings.theme;
     document.getElementById('style-select').value = settings.bookmarkStyle;
+    document.getElementById('search-engine').value = settings.searchEngine || 'google';
     document.getElementById('show-weather').checked = settings.showWeather;
     document.getElementById('show-stocks').checked = settings.showStocks;
     settingsOverlay.classList.add('open');
@@ -1223,6 +1352,19 @@
   document.getElementById('save-settings').addEventListener('click', function() {
     settings.theme = document.getElementById('theme-select').value;
     settings.bookmarkStyle = document.getElementById('style-select').value;
+    settings.searchEngine = document.getElementById('search-engine').value;
+    settings.showWeather = document.getElementById('show-weather').checked;
+    settings.showStocks = document.getElementById('show-stocks').checked;
+    setCookie('tyco_search_engine', settings.searchEngine, 365);
+    saveSettings();
+    applyTheme();
+    applyWidgetVisibility();
+    renderBM();
+    settingsOverlay.classList.remove('open');
+  });
+  document.getElementById('toggle-edit').addEventListener('click', function() {
+    isEditMode = !isEditMode;
+    if (!isEditMode) dragIndex = -1;
     settings.showWeather = document.getElementById('show-weather').checked;
     settings.showStocks = document.getElementById('show-stocks').checked;
     saveSettings();
@@ -1237,6 +1379,22 @@
   });
 
   // ── Kick off ─────────────────────────────────────────────────────
+  function applyWidgetVisibility() {
+    const weather = document.getElementById('wbox-weather');
+    const stocks = document.getElementById('wbox-stocks');
+    const widgetsCard = document.getElementById('widgets-card');
+    weather.style.display = settings.showWeather ? '' : 'none';
+    stocks.style.display = settings.showStocks ? '' : 'none';
+    widgetsCard.style.display = (!settings.showWeather && !settings.showStocks) ? 'none' : 'flex';
+  }
+  const cookieSearchEngine = getCookie('tyco_search_engine');
+  if (cookieSearchEngine && ['google','bing','duckduckgo','startpage'].includes(cookieSearchEngine)) {
+    settings.searchEngine = cookieSearchEngine;
+  } else if (!settings.searchEngine) {
+    settings.searchEngine = 'google';
+  }
+  applyTheme();
+  applyWidgetVisibility();
   applyTheme();
   document.getElementById('wbox-weather').style.display = settings.showWeather ? '' : 'none';
   document.getElementById('wbox-stocks').style.display = settings.showStocks ? '' : 'none';
