@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TyCo Bookmarks</title>
-  <link rel="icon" type="image/png" sizes="1920x1920" href="portal/images/favicon.png?v=1">
+  <link rel="icon" type="image/png" sizes="1920x1920" href="images/favicon.png?v=2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -91,9 +91,11 @@
       font-weight: 600;
     }
 
-    /* clock sits right-aligned */
+    /* clock/buttons sit right-aligned */
     .header-right {
       display: flex;
+      gap: 6px;
+      align-items: center;
       justify-content: flex-end;
     }
 
@@ -187,6 +189,27 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    .bookmark.style-rounded { border-radius: 14px; }
+    .bookmark.style-square { border-radius: 2px; }
+    .bookmark.style-tab {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 8px 10px;
+      gap: 8px;
+      border-radius: 9px 9px 0 0;
+      min-height: 44px;
+    }
+    .bookmark.style-tab .bm-label {
+      text-align: left;
+      white-space: nowrap;
+      max-width: none;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bookmark.style-pill { border-radius: 999px; }
 
     .bookmark:hover {
       background: rgba(62,207,116,0.07);
@@ -243,18 +266,16 @@
 
     .bookmark:hover .bm-label { color: var(--text); }
 
-    /* delete button */
-    .del-btn {
+    .tile-action {
       position: absolute;
       top: -5px;
-      right: -5px;
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: #ef4444;
+      background: #334155;
       border: 2px solid var(--bg);
       color: #fff;
-      font-size: 7px;
+      font-size: 9px;
       line-height: 1;
       display: none;
       align-items: center;
@@ -264,8 +285,29 @@
       transition: background 0.15s;
     }
 
-    .bookmark:hover .del-btn { display: flex; }
-    .del-btn:hover { background: #dc2626; }
+    .tile-delete { right: -5px; background: #ef4444; }
+    .tile-edit { right: 15px; background: #3b82f6; }
+    .tile-move { right: 35px; background: #64748b; }
+    .bookmark .tile-action { pointer-events: none; }
+    .bookmark.edit-mode .tile-action { display: flex; pointer-events: auto; }
+    .tile-delete:hover { background: #dc2626; }
+    .tile-edit:hover { background: #2563eb; }
+    .tile-move:hover { background: #475569; }
+    .bookmark.edit-mode { animation: wiggle 0.2s ease-in-out infinite alternate; }
+    .bookmark.drag-ready {
+      outline: 2px dashed rgba(59,130,246,0.75);
+      animation: none;
+      cursor: grab;
+    }
+    .bookmark.dragging {
+      opacity: 0.45;
+      transform: scale(0.97);
+      animation: none;
+    }
+    @keyframes wiggle {
+      from { transform: rotate(-1deg); }
+      to   { transform: rotate(1deg); }
+    }
 
     /* add tile */
     .add-tile {
@@ -532,15 +574,38 @@
 
     .mbtn:hover { opacity: 0.88; transform: translateY(-1px); }
     .mbtn:active { transform: translateY(0); opacity: 1; }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .settings-row select, .settings-row input { max-width: 170px; }
+    .icon-btn {
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 5px 8px;
+      cursor: pointer;
+      font-family: var(--f);
+      font-size: 0.7rem;
+    }
   </style>
 </head>
 <body>
 
   <!-- ── Header ── -->
   <header>
-    <div class="logo"> Bookmarks</div>
+    <div class="logo">TyCo Bookmarks 2.0</div>
     <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
     <div class="header-right">
+      <button class="icon-btn" id="toggle-edit">Edit</button>
+      <button class="icon-btn" id="open-settings">Settings</button>
       <span id="clock">00:00:00</span>
     </div>
   </header>
@@ -667,6 +732,43 @@
     </div>
   </div>
 
+  <!-- ── Edit bookmark overlay ── -->
+  <div class="overlay" id="edit-overlay">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title">Edit Bookmark</div>
+        <button class="modal-x" id="edit-close" aria-label="Close">✕</button>
+      </div>
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <label for="edit-icon-upload" id="edit-icon-preview" style="width:64px;height:64px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:0.68rem;overflow:hidden;">Upload icon</label>
+        <input id="edit-icon-upload" type="file" accept="image/*" style="display:none;">
+      </div>
+      <input class="mfield" id="edit-name" type="text" placeholder="Bookmark name" maxlength="40">
+      <input class="mfield" id="edit-url" type="url" placeholder="Bookmark URL">
+      <button class="mbtn" id="edit-move-up">Move up</button>
+      <button class="mbtn" id="edit-move-down">Move down</button>
+      <button class="mbtn" id="edit-delete" style="background:#ef4444;color:#fff;">Delete</button>
+      <button class="mbtn" id="edit-save">Save changes</button>
+      <button class="mbtn" id="edit-cancel" style="background:#334155;color:#fff;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Settings overlay ── -->
+  <div class="overlay" id="settings-overlay">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title">Settings</div>
+        <button class="modal-x" id="settings-close" aria-label="Close">✕</button>
+      </div>
+      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
+      <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
+      <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
+      <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
+      <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
+      <button class="mbtn" id="save-settings">Save settings</button>
+    </div>
+  </div>
+
   <!-- ── Add bookmark overlay ── -->
   <div class="overlay" id="bm-overlay">
     <div class="modal">
@@ -676,6 +778,10 @@
       </div>
       <input class="mfield" id="bm-name" type="text" placeholder="Name  (e.g. GitHub)" maxlength="40" autocomplete="off">
       <input class="mfield" id="bm-url"  type="url"  placeholder="URL  (e.g. https://github.com)" autocomplete="off">
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <label for="bm-icon-upload" id="bm-icon-preview" style="width:64px;height:64px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:0.68rem;overflow:hidden;">Optional icon</label>
+        <input id="bm-icon-upload" type="file" accept="image/*" style="display:none;">
+      </div>
       <button class="mbtn" id="bm-add">Add Bookmark</button>
     </div>
   </div>
@@ -696,6 +802,20 @@
 
   function lsSet(key, val) {
     try { localStorage.setItem(key, val); } catch(e) {}
+  }
+  function setCookie(name, value, days) {
+    const d = new Date();
+    d.setTime(d.getTime() + (days*24*60*60*1000));
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+  }
+  function getCookie(name) {
+    const key = name + '=';
+    const parts = document.cookie.split(';');
+    for (let p of parts) {
+      p = p.trim();
+      if (p.indexOf(key) === 0) return decodeURIComponent(p.substring(key.length));
+    }
+    return '';
   }
 
   function normaliseUrl(raw) {
@@ -773,6 +893,7 @@
   // ── Bookmarks data ───────────────────────────────────────────────
 
   const BM_KEY = '_bm_v3';
+  const SETTINGS_KEY = '_bm_settings_v1';
 
   const DEFAULTS = [
     { name: 'TyCo',           url: 'https://tycoinnovations.github.io/' },
@@ -807,6 +928,44 @@
   }
 
   let bookmarks = loadBM();
+  let editingIndex = -1;
+  let dragIndex = -1;
+  const ICON_KEY = '_bm_icons_v1';
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
+  let isEditMode = false;
+  function loadIcons() {
+    try {
+      const raw = lsGet(ICON_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch(e) { return {}; }
+  }
+  let bookmarkIcons = loadIcons();
+  function saveIcons() { lsSet(ICON_KEY, JSON.stringify(bookmarkIcons)); }
+  function loadSettings() {
+    try {
+      const raw = lsGet(SETTINGS_KEY);
+      if (!raw) return { ...defaultSettings };
+      return { ...defaultSettings, ...JSON.parse(raw) };
+    } catch (e) { return { ...defaultSettings }; }
+  }
+  let settings = loadSettings();
+  function saveSettings() { lsSet(SETTINGS_KEY, JSON.stringify(settings)); }
+  function applyTheme() {
+    const t = {
+      dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
+      dusk:    { bg:'#12131c', surface:'#1a1d2b', s2:'#23283a', text:'#e8ebff', muted:'#939aba', border:'rgba(179,166,255,0.16)' },
+      forest:  { bg:'#0f1615', surface:'#162321', s2:'#1f2f2c', text:'#e8f3ef', muted:'#89a49d', border:'rgba(99,179,147,0.2)' },
+      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' }
+    }[settings.theme] || null;
+    if (!t) return;
+    document.documentElement.style.setProperty('--bg', t.bg);
+    document.documentElement.style.setProperty('--surface', t.surface);
+    document.documentElement.style.setProperty('--s2', t.s2);
+    document.documentElement.style.setProperty('--text', t.text);
+    document.documentElement.style.setProperty('--muted', t.muted);
+    document.documentElement.style.setProperty('--border', t.border);
+    document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
+  }
 
   // ── Favicon ──────────────────────────────────────────────────────
 
@@ -826,12 +985,14 @@
     if (!origin) { wrap.appendChild(makeFallback()); return wrap; }
 
     // Google favicon service: reliable, CORS-safe, returns 16×16 blank if missing
+    const customIcon = bookmarkIcons[url];
     const img = document.createElement('img');
     img.alt = '';
     img.loading = 'lazy';
-    img.src = 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(origin) + '&sz=64';
+    img.src = customIcon || ('https://www.google.com/s2/favicons?domain=' + encodeURIComponent(origin) + '&sz=64');
 
     img.onload = function() {
+      if (customIcon) return;
       // 16px or smaller → Google sent the blank placeholder; try direct favicon.ico
       if (this.naturalWidth <= 16) {
         const img2 = document.createElement('img');
@@ -875,15 +1036,18 @@
       a.href = bm.url;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      a.className = 'bookmark';
+      a.className = 'bookmark style-' + settings.bookmarkStyle;
       a.setAttribute('aria-label', bm.name);
+      if (isEditMode) {
+        a.addEventListener('click', function(e) { e.preventDefault(); });
+      }
 
       const label = document.createElement('span');
       label.className = 'bm-label';
       label.textContent = bm.name;
 
       const del = document.createElement('button');
-      del.className = 'del-btn';
+      del.className = 'tile-action tile-delete';
       del.textContent = '✕';
       del.title = 'Remove ' + bm.name;
       del.setAttribute('aria-label', 'Remove ' + bm.name);
@@ -894,10 +1058,61 @@
         saveBM();
         renderBM();
       });
+      const edit = document.createElement('button');
+      edit.className = 'tile-action tile-edit';
+      edit.textContent = '✎';
+      edit.title = 'Edit ' + bm.name;
+      edit.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        openEditModal(i);
+      });
+      const up = document.createElement('button');
+      up.className = 'tile-action tile-move';
+      up.textContent = '↕';
+      up.title = 'Enable drag to move';
+      up.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dragIndex = (dragIndex === i) ? -1 : i;
+        renderBM();
+      });
+      if (isEditMode) a.classList.add('edit-mode');
+      if (dragIndex === i) {
+        a.classList.add('drag-ready');
+        a.setAttribute('draggable', 'true');
+      } else {
+        a.removeAttribute('draggable');
+      }
+      a.addEventListener('dragstart', function(e) {
+        if (dragIndex !== i) { e.preventDefault(); return; }
+        a.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(i));
+      });
+      a.addEventListener('dragend', function() { a.classList.remove('dragging'); });
+      a.addEventListener('dragover', function(e) {
+        if (dragIndex < 0 || dragIndex === i) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      a.addEventListener('drop', function(e) {
+        if (dragIndex < 0) return;
+        e.preventDefault();
+        const from = dragIndex;
+        const to = i;
+        if (from === to) return;
+        const moved = bookmarks.splice(from, 1)[0];
+        bookmarks.splice(to, 0, moved);
+        dragIndex = to;
+        saveBM();
+        renderBM();
+      });
 
       a.appendChild(createIcon(bm.url));
       a.appendChild(label);
       a.appendChild(del);
+      a.appendChild(edit);
+      a.appendChild(up);
       grid.appendChild(a);
     });
 
@@ -917,10 +1132,16 @@
   const bmNameEl  = document.getElementById('bm-name');
   const bmUrlEl   = document.getElementById('bm-url');
   const bmAdd     = document.getElementById('bm-add');
+  const bmIconUpload = document.getElementById('bm-icon-upload');
+  const bmIconPreview = document.getElementById('bm-icon-preview');
+  let newIconData = '';
 
   function openBmModal() {
     bmNameEl.value = '';
     bmUrlEl.value  = '';
+    newIconData = '';
+    bmIconUpload.value = '';
+    bmIconPreview.innerHTML = 'Optional icon';
     bmOverlay.classList.add('open');
     bmNameEl.focus();
   }
@@ -944,6 +1165,10 @@
       return;
     }
     bookmarks.push({ name, url });
+    if (newIconData) {
+      bookmarkIcons[url] = newIconData;
+      saveIcons();
+    }
     saveBM();
     renderBM();
     closeBmModal();
@@ -957,14 +1182,91 @@
   bmNameEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') bmUrlEl.focus();
   });
+  bmIconUpload.addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+      newIconData = String(reader.result || '');
+      bmIconPreview.innerHTML = '<img src="' + newIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const editOverlay = document.getElementById('edit-overlay');
+  const editClose = document.getElementById('edit-close');
+  const editName = document.getElementById('edit-name');
+  const editUrl = document.getElementById('edit-url');
+  const editIconUpload = document.getElementById('edit-icon-upload');
+  const editIconPreview = document.getElementById('edit-icon-preview');
+  let editIconData = '';
+  document.getElementById('edit-save').addEventListener('click', function() {
+    const name = editName.value.trim();
+    const url = normaliseUrl(editUrl.value);
+    if (!name || !url || editingIndex < 0) return;
+    const previousUrl = bookmarks[editingIndex].url;
+    bookmarks[editingIndex] = { name, url };
+    if (editIconData) bookmarkIcons[url] = editIconData;
+    if (previousUrl !== url && bookmarkIcons[previousUrl] && !bookmarkIcons[url]) {
+      bookmarkIcons[url] = bookmarkIcons[previousUrl];
+      delete bookmarkIcons[previousUrl];
+    }
+    saveIcons();
+    saveBM(); renderBM();
+    editOverlay.classList.remove('open');
+  });
+  function openEditModal(i) {
+    editingIndex = i;
+    editName.value = bookmarks[i].name;
+    editUrl.value = bookmarks[i].url;
+    editIconData = bookmarkIcons[bookmarks[i].url] || '';
+    editIconPreview.innerHTML = editIconData ? '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : 'Upload icon';
+    editOverlay.classList.add('open');
+  }
+  function closeEditModal() { editOverlay.classList.remove('open'); }
+  editClose.addEventListener('click', closeEditModal);
+  document.getElementById('edit-cancel').addEventListener('click', closeEditModal);
+  document.getElementById('edit-delete').addEventListener('click', function() {
+    if (editingIndex < 0) return;
+    const url = bookmarks[editingIndex].url;
+    bookmarks.splice(editingIndex, 1);
+    delete bookmarkIcons[url];
+    saveIcons(); saveBM(); renderBM(); closeEditModal();
+  });
+  document.getElementById('edit-move-up').addEventListener('click', function() {
+    if (editingIndex <= 0) return;
+    [bookmarks[editingIndex - 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex - 1]];
+    editingIndex--; saveBM(); renderBM(); openEditModal(editingIndex);
+  });
+  document.getElementById('edit-move-down').addEventListener('click', function() {
+    if (editingIndex < 0 || editingIndex >= bookmarks.length - 1) return;
+    [bookmarks[editingIndex + 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex + 1]];
+    editingIndex++; saveBM(); renderBM(); openEditModal(editingIndex);
+  });
+  editIconUpload.addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+      editIconData = String(reader.result || '');
+      editIconPreview.innerHTML = '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    reader.readAsDataURL(file);
+  });
+  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEditModal(); });
 
   // ── Search ───────────────────────────────────────────────────────
 
-  const SEARCH_BASE = 'https://www.startpage.com/do/search?q=';
-
   function searchFor(q) {
     if (!q) return;
-    window.open(SEARCH_BASE + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
+    const engines = {
+      google: 'https://www.google.com/search?q=',
+      bing: 'https://www.bing.com/search?q=',
+      duckduckgo: 'https://duckduckgo.com/?q=',
+      startpage: 'https://www.startpage.com/do/search?q='
+    };
+    const base = engines[settings.searchEngine] || engines.google;
+    window.open(base + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
   }
 
   // tag buttons
@@ -1020,7 +1322,55 @@
     }
   });
 
+  const settingsOverlay = document.getElementById('settings-overlay');
+  document.getElementById('open-settings').addEventListener('click', function() {
+    document.getElementById('theme-select').value = settings.theme;
+    document.getElementById('style-select').value = settings.bookmarkStyle;
+    document.getElementById('search-engine').value = settings.searchEngine || 'google';
+    document.getElementById('show-weather').checked = settings.showWeather;
+    document.getElementById('show-stocks').checked = settings.showStocks;
+    settingsOverlay.classList.add('open');
+  });
+  document.getElementById('settings-close').addEventListener('click', () => settingsOverlay.classList.remove('open'));
+  document.getElementById('save-settings').addEventListener('click', function() {
+    settings.theme = document.getElementById('theme-select').value;
+    settings.bookmarkStyle = document.getElementById('style-select').value;
+    settings.searchEngine = document.getElementById('search-engine').value;
+    settings.showWeather = document.getElementById('show-weather').checked;
+    settings.showStocks = document.getElementById('show-stocks').checked;
+    setCookie('tyco_search_engine', settings.searchEngine, 365);
+    saveSettings();
+    applyTheme();
+    applyWidgetVisibility();
+    renderBM();
+    settingsOverlay.classList.remove('open');
+  });
+  document.getElementById('toggle-edit').addEventListener('click', function() {
+    isEditMode = !isEditMode;
+    if (!isEditMode) dragIndex = -1;
+    this.textContent = isEditMode ? 'Done' : 'Edit';
+    renderBM();
+  });
+
   // ── Kick off ─────────────────────────────────────────────────────
+  function applyWidgetVisibility() {
+    const weather = document.getElementById('wbox-weather');
+    const stocks = document.getElementById('wbox-stocks');
+    const widgetsCard = document.getElementById('widgets-card');
+    weather.style.display = settings.showWeather ? '' : 'none';
+    stocks.style.display = settings.showStocks ? '' : 'none';
+    widgetsCard.style.display = (!settings.showWeather && !settings.showStocks) ? 'none' : 'flex';
+  }
+  const cookieSearchEngine = getCookie('tyco_search_engine');
+  if (cookieSearchEngine && ['google','bing','duckduckgo','startpage'].includes(cookieSearchEngine)) {
+    settings.searchEngine = cookieSearchEngine;
+  } else if (!settings.searchEngine) {
+    settings.searchEngine = 'google';
+  }
+  if (!['dark','dusk','forest','ocean'].includes(settings.theme)) settings.theme = 'dark';
+  if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
+  applyTheme();
+  applyWidgetVisibility();
   renderBM();
   initName();
   </script>
