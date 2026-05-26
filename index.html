@@ -208,13 +208,6 @@
       flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    .bookmark.style-square { border-radius: 6px; }
-    .bookmark.style-tab {
-      border-radius: 10px 10px 5px 5px;
-      clip-path: polygon(0 10%, 20% 10%, 26% 0, 100% 0, 100% 100%, 0 100%);
-      padding-top: 12px;
     }
     .bookmark.style-pill { border-radius: 999px; }
 
@@ -297,8 +290,6 @@
     .tile-move { right: 35px; background: #64748b; }
     .bookmark .tile-action { pointer-events: none; }
     .bookmark.edit-mode .tile-action { display: flex; pointer-events: auto; }
-    .bookmark:hover .tile-action,
-    .bookmark.edit-mode .tile-action { display: flex; }
     .tile-delete:hover { background: #dc2626; }
     .tile-edit:hover { background: #2563eb; }
     .tile-move:hover { background: #475569; }
@@ -616,10 +607,6 @@
       <button class="icon-btn" id="toggle-edit">Edit</button>
       <select id="profile-switch" class="icon-btn" style="max-width:140px;"></select>
       <button class="icon-btn" id="new-profile">+ Profile</button>
-    <div class="logo">TyCo Bookmarks 2.0</div>
-    <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
-    <div class="header-right">
-      <button class="icon-btn" id="toggle-edit">Edit</button>
       <button class="icon-btn" id="open-settings">Settings</button>
       <span id="clock">00:00:00</span>
     </div>
@@ -760,8 +747,6 @@
       </div>
       <input class="mfield" id="edit-name" type="text" placeholder="Bookmark name" maxlength="40">
       <input class="mfield" id="edit-url" type="url" placeholder="Bookmark URL">
-      <button class="mbtn" id="edit-move-up">Move up</button>
-      <button class="mbtn" id="edit-move-down">Move down</button>
       <button class="mbtn" id="edit-delete" style="background:#ef4444;color:#fff;">Delete</button>
       <button class="mbtn" id="edit-save">Save changes</button>
       <button class="mbtn" id="edit-cancel" style="background:#334155;color:#fff;">Cancel</button>
@@ -790,8 +775,6 @@
       <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
-      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Dark</option><option value="light">Light</option></select></div>
-      <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
       <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
       <button class="mbtn" id="save-settings">Save settings</button>
@@ -923,8 +906,6 @@
 
   const PROFILES_KEY = '_bm_profiles_v1';
   const ACTIVE_PROFILE_KEY = '_bm_active_profile_v1';
-  const BM_KEY = '_bm_v3';
-  const SETTINGS_KEY = '_bm_settings_v1';
 
   const DEFAULTS = [
     { name: 'TyCo',           url: 'https://tycoinnovations.github.io/' },
@@ -1010,56 +991,6 @@
     document.documentElement.style.setProperty('--muted', t.muted);
     document.documentElement.style.setProperty('--border', t.border);
     document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
-  }
-
-  let bookmarks = loadBM();
-  let editingIndex = -1;
-  let dragIndex = -1;
-  const ICON_KEY = '_bm_icons_v1';
-  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
-  const ICON_KEY = '_bm_icons_v1';
-  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true };
-  let isEditMode = false;
-  function loadIcons() {
-    try {
-      const raw = lsGet(ICON_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch(e) { return {}; }
-  }
-  let bookmarkIcons = loadIcons();
-  function saveIcons() { lsSet(ICON_KEY, JSON.stringify(bookmarkIcons)); }
-  function loadSettings() {
-    try {
-      const raw = lsGet(SETTINGS_KEY);
-      if (!raw) return { ...defaultSettings };
-      return { ...defaultSettings, ...JSON.parse(raw) };
-    } catch (e) { return { ...defaultSettings }; }
-  }
-  let settings = loadSettings();
-  function saveSettings() { lsSet(SETTINGS_KEY, JSON.stringify(settings)); }
-  function applyTheme() {
-    const t = {
-      dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
-      dusk:    { bg:'#12131c', surface:'#1a1d2b', s2:'#23283a', text:'#e8ebff', muted:'#939aba', border:'rgba(179,166,255,0.16)' },
-      forest:  { bg:'#0f1615', surface:'#162321', s2:'#1f2f2c', text:'#e8f3ef', muted:'#89a49d', border:'rgba(99,179,147,0.2)' },
-      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' }
-    }[settings.theme] || null;
-    if (!t) return;
-    document.documentElement.style.setProperty('--bg', t.bg);
-    document.documentElement.style.setProperty('--surface', t.surface);
-    document.documentElement.style.setProperty('--s2', t.s2);
-    document.documentElement.style.setProperty('--text', t.text);
-    document.documentElement.style.setProperty('--muted', t.muted);
-    document.documentElement.style.setProperty('--border', t.border);
-    document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
-    if (settings.theme === 'light') {
-      document.documentElement.style.setProperty('--bg', '#f4f6fc');
-      document.documentElement.style.setProperty('--surface', '#ffffff');
-      document.documentElement.style.setProperty('--s2', '#eef2ff');
-      document.documentElement.style.setProperty('--text', '#171a24');
-      document.documentElement.style.setProperty('--muted', '#56607a');
-      document.documentElement.style.setProperty('--border', 'rgba(0,0,0,0.09)');
-    }
   }
 
   // ── Favicon ──────────────────────────────────────────────────────
@@ -1202,11 +1133,6 @@
         saveBM();
         renderBM();
       });
-      up.title = 'Move bookmark';
-      up.addEventListener('click', function(e) {
-        e.preventDefault(); e.stopPropagation(); openEditModal(i);
-      });
-      if (isEditMode) a.classList.add('edit-mode');
 
       a.appendChild(createIcon(bm.url));
       a.appendChild(label);
@@ -1292,68 +1218,6 @@
     };
     reader.readAsDataURL(file);
   });
-
-  const editOverlay = document.getElementById('edit-overlay');
-  const editClose = document.getElementById('edit-close');
-  const editName = document.getElementById('edit-name');
-  const editUrl = document.getElementById('edit-url');
-  const editIconUpload = document.getElementById('edit-icon-upload');
-  const editIconPreview = document.getElementById('edit-icon-preview');
-  let editIconData = '';
-  document.getElementById('edit-save').addEventListener('click', function() {
-    const name = editName.value.trim();
-    const url = normaliseUrl(editUrl.value);
-    if (!name || !url || editingIndex < 0) return;
-    const previousUrl = bookmarks[editingIndex].url;
-    bookmarks[editingIndex] = { name, url };
-    if (editIconData) bookmarkIcons[url] = editIconData;
-    if (previousUrl !== url && bookmarkIcons[previousUrl] && !bookmarkIcons[url]) {
-      bookmarkIcons[url] = bookmarkIcons[previousUrl];
-      delete bookmarkIcons[previousUrl];
-    }
-    saveIcons();
-    saveBM(); renderBM();
-    editOverlay.classList.remove('open');
-  });
-  function openEditModal(i) {
-    editingIndex = i;
-    editName.value = bookmarks[i].name;
-    editUrl.value = bookmarks[i].url;
-    editIconData = bookmarkIcons[bookmarks[i].url] || '';
-    editIconPreview.innerHTML = editIconData ? '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : 'Upload icon';
-    editOverlay.classList.add('open');
-  }
-  function closeEditModal() { editOverlay.classList.remove('open'); }
-  editClose.addEventListener('click', closeEditModal);
-  document.getElementById('edit-cancel').addEventListener('click', closeEditModal);
-  document.getElementById('edit-delete').addEventListener('click', function() {
-    if (editingIndex < 0) return;
-    const url = bookmarks[editingIndex].url;
-    bookmarks.splice(editingIndex, 1);
-    delete bookmarkIcons[url];
-    saveIcons(); saveBM(); renderBM(); closeEditModal();
-  });
-  document.getElementById('edit-move-up').addEventListener('click', function() {
-    if (editingIndex <= 0) return;
-    [bookmarks[editingIndex - 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex - 1]];
-    editingIndex--; saveBM(); renderBM(); openEditModal(editingIndex);
-  });
-  document.getElementById('edit-move-down').addEventListener('click', function() {
-    if (editingIndex < 0 || editingIndex >= bookmarks.length - 1) return;
-    [bookmarks[editingIndex + 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex + 1]];
-    editingIndex++; saveBM(); renderBM(); openEditModal(editingIndex);
-  });
-  editIconUpload.addEventListener('change', function(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function() {
-      editIconData = String(reader.result || '');
-      editIconPreview.innerHTML = '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">';
-    };
-    reader.readAsDataURL(file);
-  });
-  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEditModal(); });
 
   const editOverlay = document.getElementById('edit-overlay');
   const editClose = document.getElementById('edit-close');
@@ -1500,15 +1364,6 @@
   document.getElementById('toggle-edit').addEventListener('click', function() {
     isEditMode = !isEditMode;
     if (!isEditMode) dragIndex = -1;
-    settings.showWeather = document.getElementById('show-weather').checked;
-    settings.showStocks = document.getElementById('show-stocks').checked;
-    saveSettings();
-    document.getElementById('wbox-weather').style.display = settings.showWeather ? '' : 'none';
-    document.getElementById('wbox-stocks').style.display = settings.showStocks ? '' : 'none';
-    location.reload();
-  });
-  document.getElementById('toggle-edit').addEventListener('click', function() {
-    isEditMode = !isEditMode;
     this.textContent = isEditMode ? 'Done' : 'Edit';
     renderBM();
   });
@@ -1556,11 +1411,6 @@
   });
   applyTheme();
   applyWidgetVisibility();
-  applyTheme();
-  applyWidgetVisibility();
-  applyTheme();
-  document.getElementById('wbox-weather').style.display = settings.showWeather ? '' : 'none';
-  document.getElementById('wbox-stocks').style.display = settings.showStocks ? '' : 'none';
   renderBM();
   initName();
   </script>
