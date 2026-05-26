@@ -601,10 +601,12 @@
 
   <!-- ── Header ── -->
   <header>
-    <div class="logo">TyCo Bookmarks 2.0</div>
+    <div class="logo">TyCo Bookmarks</div>
     <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
     <div class="header-right">
       <button class="icon-btn" id="toggle-edit">Edit</button>
+      <select id="profile-switch" class="icon-btn" style="max-width:140px;"></select>
+      <button class="icon-btn" id="new-profile">+ Profile</button>
       <button class="icon-btn" id="open-settings">Settings</button>
       <span id="clock">00:00:00</span>
     </div>
@@ -745,11 +747,21 @@
       </div>
       <input class="mfield" id="edit-name" type="text" placeholder="Bookmark name" maxlength="40">
       <input class="mfield" id="edit-url" type="url" placeholder="Bookmark URL">
-      <button class="mbtn" id="edit-move-up">Move up</button>
-      <button class="mbtn" id="edit-move-down">Move down</button>
       <button class="mbtn" id="edit-delete" style="background:#ef4444;color:#fff;">Delete</button>
       <button class="mbtn" id="edit-save">Save changes</button>
       <button class="mbtn" id="edit-cancel" style="background:#334155;color:#fff;">Cancel</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="profile-overlay">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title">New Profile</div>
+        <button class="modal-x" id="profile-close" aria-label="Close">✕</button>
+      </div>
+      <input class="mfield" id="profile-name" type="text" placeholder="Profile name (e.g. Work)">
+      <input class="mfield" id="profile-emoji" type="text" placeholder="Emoji icon (e.g. 💼)" maxlength="2">
+      <button class="mbtn" id="profile-save">Create profile</button>
     </div>
   </div>
 
@@ -892,8 +904,8 @@
 
   // ── Bookmarks data ───────────────────────────────────────────────
 
-  const BM_KEY = '_bm_v3';
-  const SETTINGS_KEY = '_bm_settings_v1';
+  const PROFILES_KEY = '_bm_profiles_v1';
+  const ACTIVE_PROFILE_KEY = '_bm_active_profile_v1';
 
   const DEFAULTS = [
     { name: 'TyCo',           url: 'https://tycoinnovations.github.io/' },
@@ -912,44 +924,58 @@
     { name: 'M365',           url: 'https://www.office.com' },
   ];
 
-  function loadBM() {
+  function makeDefaultProfile(name, emoji) {
+    return {
+      name: name || 'Default',
+      emoji: emoji || '📚',
+      bookmarks: DEFAULTS.map(b => ({ ...b })),
+      icons: {},
+      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' }
+    };
+  }
+  function loadProfiles() {
     try {
-      const raw = lsGet(BM_KEY);
+      const raw = lsGet(PROFILES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) return parsed;
       }
     } catch(e) {}
-    return DEFAULTS.map(b => ({ ...b }));
+    return { default: makeDefaultProfile('Personal', '🏠') };
   }
-
-  function saveBM() {
-    lsSet(BM_KEY, JSON.stringify(bookmarks));
+  let profiles = loadProfiles();
+  let activeProfileId = lsGet(ACTIVE_PROFILE_KEY) || Object.keys(profiles)[0] || 'default';
+  if (!profiles[activeProfileId]) activeProfileId = Object.keys(profiles)[0];
+  function currentProfile() { return profiles[activeProfileId]; }
+  function persistProfiles() {
+    lsSet(PROFILES_KEY, JSON.stringify(profiles));
+    lsSet(ACTIVE_PROFILE_KEY, activeProfileId);
   }
-
-  let bookmarks = loadBM();
+  let bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
   let editingIndex = -1;
   let dragIndex = -1;
-  const ICON_KEY = '_bm_icons_v1';
   const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
   let isEditMode = false;
-  function loadIcons() {
-    try {
-      const raw = lsGet(ICON_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch(e) { return {}; }
+  let bookmarkIcons = { ...(currentProfile().icons || {}) };
+  let settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
+  function saveBM() { currentProfile().bookmarks = bookmarks.map(b => ({...b})); persistProfiles(); }
+  function saveIcons() { currentProfile().icons = { ...bookmarkIcons }; persistProfiles(); }
+  function saveSettings() { currentProfile().settings = { ...settings }; persistProfiles(); }
+  function applyProfile() {
+    bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
+    bookmarkIcons = { ...(currentProfile().icons || {}) };
+    settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
+    applyTheme();
+    applyWidgetVisibility();
+    renderBM();
+    const sw = document.getElementById('profile-switch');
+    if (sw) sw.value = activeProfileId;
   }
-  let bookmarkIcons = loadIcons();
-  function saveIcons() { lsSet(ICON_KEY, JSON.stringify(bookmarkIcons)); }
-  function loadSettings() {
-    try {
-      const raw = lsGet(SETTINGS_KEY);
-      if (!raw) return { ...defaultSettings };
-      return { ...defaultSettings, ...JSON.parse(raw) };
-    } catch (e) { return { ...defaultSettings }; }
+  function renderProfiles() {
+    const sw = document.getElementById('profile-switch');
+    sw.innerHTML = Object.entries(profiles).map(([id,p]) => `<option value="${id}">${(p.emoji||'📚')} ${p.name}</option>`).join('');
+    sw.value = activeProfileId;
   }
-  let settings = loadSettings();
-  function saveSettings() { lsSet(SETTINGS_KEY, JSON.stringify(settings)); }
   function applyTheme() {
     const t = {
       dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
@@ -1233,16 +1259,6 @@
     delete bookmarkIcons[url];
     saveIcons(); saveBM(); renderBM(); closeEditModal();
   });
-  document.getElementById('edit-move-up').addEventListener('click', function() {
-    if (editingIndex <= 0) return;
-    [bookmarks[editingIndex - 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex - 1]];
-    editingIndex--; saveBM(); renderBM(); openEditModal(editingIndex);
-  });
-  document.getElementById('edit-move-down').addEventListener('click', function() {
-    if (editingIndex < 0 || editingIndex >= bookmarks.length - 1) return;
-    [bookmarks[editingIndex + 1], bookmarks[editingIndex]] = [bookmarks[editingIndex], bookmarks[editingIndex + 1]];
-    editingIndex++; saveBM(); renderBM(); openEditModal(editingIndex);
-  });
   editIconUpload.addEventListener('change', function(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -1369,6 +1385,30 @@
   }
   if (!['dark','dusk','forest','ocean'].includes(settings.theme)) settings.theme = 'dark';
   if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
+  renderProfiles();
+  document.getElementById('profile-switch').addEventListener('change', function() {
+    activeProfileId = this.value;
+    applyProfile();
+  });
+  const profileOverlay = document.getElementById('profile-overlay');
+  document.getElementById('new-profile').addEventListener('click', function() {
+    document.getElementById('profile-name').value = '';
+    document.getElementById('profile-emoji').value = '';
+    profileOverlay.classList.add('open');
+  });
+  document.getElementById('profile-close').addEventListener('click', () => profileOverlay.classList.remove('open'));
+  document.getElementById('profile-save').addEventListener('click', function() {
+    const name = document.getElementById('profile-name').value.trim();
+    const emoji = document.getElementById('profile-emoji').value.trim() || '📚';
+    if (!name) return;
+    const id = 'p_' + Date.now().toString(36);
+    profiles[id] = makeDefaultProfile(name, emoji);
+    activeProfileId = id;
+    persistProfiles();
+    renderProfiles();
+    applyProfile();
+    profileOverlay.classList.remove('open');
+  });
   applyTheme();
   applyWidgetVisibility();
   renderBM();
