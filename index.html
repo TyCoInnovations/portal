@@ -206,6 +206,11 @@
       max-width: none;
       overflow: hidden;
       text-overflow: ellipsis;
+    .bookmark.style-square { border-radius: 6px; }
+    .bookmark.style-tab {
+      border-radius: 10px 10px 5px 5px;
+      clip-path: polygon(0 10%, 20% 10%, 26% 0, 100% 0, 100% 100%, 0 100%);
+      padding-top: 12px;
     }
     .bookmark.style-pill { border-radius: 999px; }
 
@@ -286,6 +291,7 @@
     .tile-delete { right: -5px; background: #ef4444; }
     .tile-edit { right: 15px; background: #3b82f6; }
     .tile-move { right: 35px; background: #64748b; }
+    .bookmark:hover .tile-action,
     .bookmark.edit-mode .tile-action { display: flex; }
     .tile-delete:hover { background: #dc2626; }
     .tile-edit:hover { background: #2563eb; }
@@ -760,6 +766,8 @@
       <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
+      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+      <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
       <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
       <button class="mbtn" id="save-settings">Save settings</button>
@@ -929,6 +937,8 @@
   let dragIndex = -1;
   const ICON_KEY = '_bm_icons_v1';
   const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
+  const ICON_KEY = '_bm_icons_v1';
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true };
   let isEditMode = false;
   function loadIcons() {
     try {
@@ -962,6 +972,14 @@
     document.documentElement.style.setProperty('--muted', t.muted);
     document.documentElement.style.setProperty('--border', t.border);
     document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
+    if (settings.theme === 'light') {
+      document.documentElement.style.setProperty('--bg', '#f4f6fc');
+      document.documentElement.style.setProperty('--surface', '#ffffff');
+      document.documentElement.style.setProperty('--s2', '#eef2ff');
+      document.documentElement.style.setProperty('--text', '#171a24');
+      document.documentElement.style.setProperty('--muted', '#56607a');
+      document.documentElement.style.setProperty('--border', 'rgba(0,0,0,0.09)');
+    }
   }
 
   // ── Favicon ──────────────────────────────────────────────────────
@@ -1099,6 +1117,11 @@
         saveBM();
         renderBM();
       });
+      up.title = 'Move bookmark';
+      up.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation(); openEditModal(i);
+      });
+      if (isEditMode) a.classList.add('edit-mode');
 
       a.appendChild(createIcon(bm.url));
       a.appendChild(label);
@@ -1249,6 +1272,8 @@
 
   // ── Search ───────────────────────────────────────────────────────
 
+  // ── Search ───────────────────────────────────────────────────────
+
   function searchFor(q) {
     if (!q) return;
     const engines = {
@@ -1340,6 +1365,15 @@
   document.getElementById('toggle-edit').addEventListener('click', function() {
     isEditMode = !isEditMode;
     if (!isEditMode) dragIndex = -1;
+    settings.showWeather = document.getElementById('show-weather').checked;
+    settings.showStocks = document.getElementById('show-stocks').checked;
+    saveSettings();
+    document.getElementById('wbox-weather').style.display = settings.showWeather ? '' : 'none';
+    document.getElementById('wbox-stocks').style.display = settings.showStocks ? '' : 'none';
+    location.reload();
+  });
+  document.getElementById('toggle-edit').addEventListener('click', function() {
+    isEditMode = !isEditMode;
     this.textContent = isEditMode ? 'Done' : 'Edit';
     renderBM();
   });
@@ -1361,6 +1395,9 @@
   }
   applyTheme();
   applyWidgetVisibility();
+  applyTheme();
+  document.getElementById('wbox-weather').style.display = settings.showWeather ? '' : 'none';
+  document.getElementById('wbox-stocks').style.display = settings.showStocks ? '' : 'none';
   renderBM();
   initName();
   </script>
