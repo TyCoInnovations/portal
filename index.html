@@ -204,6 +204,10 @@
       text-align: left;
       white-space: nowrap;
       max-width: none;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
       overflow: hidden;
       text-overflow: ellipsis;
     .bookmark.style-square { border-radius: 6px; }
@@ -291,6 +295,8 @@
     .tile-delete { right: -5px; background: #ef4444; }
     .tile-edit { right: 15px; background: #3b82f6; }
     .tile-move { right: 35px; background: #64748b; }
+    .bookmark .tile-action { pointer-events: none; }
+    .bookmark.edit-mode .tile-action { display: flex; pointer-events: auto; }
     .bookmark:hover .tile-action,
     .bookmark.edit-mode .tile-action { display: flex; }
     .tile-delete:hover { background: #dc2626; }
@@ -604,6 +610,12 @@
 
   <!-- ── Header ── -->
   <header>
+    <div class="logo">TyCo Bookmarks</div>
+    <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
+    <div class="header-right">
+      <button class="icon-btn" id="toggle-edit">Edit</button>
+      <select id="profile-switch" class="icon-btn" style="max-width:140px;"></select>
+      <button class="icon-btn" id="new-profile">+ Profile</button>
     <div class="logo">TyCo Bookmarks 2.0</div>
     <div id="header-greeting">Good morning, <span id="uname-display">there</span></div>
     <div class="header-right">
@@ -756,6 +768,18 @@
     </div>
   </div>
 
+  <div class="overlay" id="profile-overlay">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title">New Profile</div>
+        <button class="modal-x" id="profile-close" aria-label="Close">✕</button>
+      </div>
+      <input class="mfield" id="profile-name" type="text" placeholder="Profile name (e.g. Work)">
+      <input class="mfield" id="profile-emoji" type="text" placeholder="Emoji icon (e.g. 💼)" maxlength="2">
+      <button class="mbtn" id="profile-save">Create profile</button>
+    </div>
+  </div>
+
   <!-- ── Settings overlay ── -->
   <div class="overlay" id="settings-overlay">
     <div class="modal">
@@ -897,6 +921,8 @@
 
   // ── Bookmarks data ───────────────────────────────────────────────
 
+  const PROFILES_KEY = '_bm_profiles_v1';
+  const ACTIVE_PROFILE_KEY = '_bm_active_profile_v1';
   const BM_KEY = '_bm_v3';
   const SETTINGS_KEY = '_bm_settings_v1';
 
@@ -917,19 +943,73 @@
     { name: 'M365',           url: 'https://www.office.com' },
   ];
 
-  function loadBM() {
+  function makeDefaultProfile(name, emoji) {
+    return {
+      name: name || 'Default',
+      emoji: emoji || '📚',
+      bookmarks: DEFAULTS.map(b => ({ ...b })),
+      icons: {},
+      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' }
+    };
+  }
+  function loadProfiles() {
     try {
-      const raw = lsGet(BM_KEY);
+      const raw = lsGet(PROFILES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) return parsed;
       }
     } catch(e) {}
-    return DEFAULTS.map(b => ({ ...b }));
+    return { default: makeDefaultProfile('Personal', '🏠') };
   }
-
-  function saveBM() {
-    lsSet(BM_KEY, JSON.stringify(bookmarks));
+  let profiles = loadProfiles();
+  let activeProfileId = lsGet(ACTIVE_PROFILE_KEY) || Object.keys(profiles)[0] || 'default';
+  if (!profiles[activeProfileId]) activeProfileId = Object.keys(profiles)[0];
+  function currentProfile() { return profiles[activeProfileId]; }
+  function persistProfiles() {
+    lsSet(PROFILES_KEY, JSON.stringify(profiles));
+    lsSet(ACTIVE_PROFILE_KEY, activeProfileId);
+  }
+  let bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
+  let editingIndex = -1;
+  let dragIndex = -1;
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
+  let isEditMode = false;
+  let bookmarkIcons = { ...(currentProfile().icons || {}) };
+  let settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
+  function saveBM() { currentProfile().bookmarks = bookmarks.map(b => ({...b})); persistProfiles(); }
+  function saveIcons() { currentProfile().icons = { ...bookmarkIcons }; persistProfiles(); }
+  function saveSettings() { currentProfile().settings = { ...settings }; persistProfiles(); }
+  function applyProfile() {
+    bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
+    bookmarkIcons = { ...(currentProfile().icons || {}) };
+    settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
+    applyTheme();
+    applyWidgetVisibility();
+    renderBM();
+    const sw = document.getElementById('profile-switch');
+    if (sw) sw.value = activeProfileId;
+  }
+  function renderProfiles() {
+    const sw = document.getElementById('profile-switch');
+    sw.innerHTML = Object.entries(profiles).map(([id,p]) => `<option value="${id}">${(p.emoji||'📚')} ${p.name}</option>`).join('');
+    sw.value = activeProfileId;
+  }
+  function applyTheme() {
+    const t = {
+      dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
+      dusk:    { bg:'#12131c', surface:'#1a1d2b', s2:'#23283a', text:'#e8ebff', muted:'#939aba', border:'rgba(179,166,255,0.16)' },
+      forest:  { bg:'#0f1615', surface:'#162321', s2:'#1f2f2c', text:'#e8f3ef', muted:'#89a49d', border:'rgba(99,179,147,0.2)' },
+      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' }
+    }[settings.theme] || null;
+    if (!t) return;
+    document.documentElement.style.setProperty('--bg', t.bg);
+    document.documentElement.style.setProperty('--surface', t.surface);
+    document.documentElement.style.setProperty('--s2', t.s2);
+    document.documentElement.style.setProperty('--text', t.text);
+    document.documentElement.style.setProperty('--muted', t.muted);
+    document.documentElement.style.setProperty('--border', t.border);
+    document.body.style.background = `radial-gradient(1200px 700px at 10% 0%, rgba(62,207,116,0.08), transparent 55%), radial-gradient(1200px 700px at 100% 100%, rgba(59,130,246,0.09), transparent 55%), ${t.bg}`;
   }
 
   let bookmarks = loadBM();
@@ -1053,6 +1133,9 @@
       a.rel = 'noopener noreferrer';
       a.className = 'bookmark style-' + settings.bookmarkStyle;
       a.setAttribute('aria-label', bm.name);
+      if (isEditMode) {
+        a.addEventListener('click', function(e) { e.preventDefault(); });
+      }
 
       const label = document.createElement('span');
       label.className = 'bm-label';
@@ -1092,6 +1175,8 @@
       if (dragIndex === i) {
         a.classList.add('drag-ready');
         a.setAttribute('draggable', 'true');
+      } else {
+        a.removeAttribute('draggable');
       }
       a.addEventListener('dragstart', function(e) {
         if (dragIndex !== i) { e.preventDefault(); return; }
@@ -1270,7 +1355,57 @@
   });
   editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEditModal(); });
 
-  // ── Search ───────────────────────────────────────────────────────
+  const editOverlay = document.getElementById('edit-overlay');
+  const editClose = document.getElementById('edit-close');
+  const editName = document.getElementById('edit-name');
+  const editUrl = document.getElementById('edit-url');
+  const editIconUpload = document.getElementById('edit-icon-upload');
+  const editIconPreview = document.getElementById('edit-icon-preview');
+  let editIconData = '';
+  document.getElementById('edit-save').addEventListener('click', function() {
+    const name = editName.value.trim();
+    const url = normaliseUrl(editUrl.value);
+    if (!name || !url || editingIndex < 0) return;
+    const previousUrl = bookmarks[editingIndex].url;
+    bookmarks[editingIndex] = { name, url };
+    if (editIconData) bookmarkIcons[url] = editIconData;
+    if (previousUrl !== url && bookmarkIcons[previousUrl] && !bookmarkIcons[url]) {
+      bookmarkIcons[url] = bookmarkIcons[previousUrl];
+      delete bookmarkIcons[previousUrl];
+    }
+    saveIcons();
+    saveBM(); renderBM();
+    editOverlay.classList.remove('open');
+  });
+  function openEditModal(i) {
+    editingIndex = i;
+    editName.value = bookmarks[i].name;
+    editUrl.value = bookmarks[i].url;
+    editIconData = bookmarkIcons[bookmarks[i].url] || '';
+    editIconPreview.innerHTML = editIconData ? '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : 'Upload icon';
+    editOverlay.classList.add('open');
+  }
+  function closeEditModal() { editOverlay.classList.remove('open'); }
+  editClose.addEventListener('click', closeEditModal);
+  document.getElementById('edit-cancel').addEventListener('click', closeEditModal);
+  document.getElementById('edit-delete').addEventListener('click', function() {
+    if (editingIndex < 0) return;
+    const url = bookmarks[editingIndex].url;
+    bookmarks.splice(editingIndex, 1);
+    delete bookmarkIcons[url];
+    saveIcons(); saveBM(); renderBM(); closeEditModal();
+  });
+  editIconUpload.addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+      editIconData = String(reader.result || '');
+      editIconPreview.innerHTML = '<img src="' + editIconData + '" alt="" style="width:100%;height:100%;object-fit:cover;">';
+    };
+    reader.readAsDataURL(file);
+  });
+  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) closeEditModal(); });
 
   // ── Search ───────────────────────────────────────────────────────
 
@@ -1393,6 +1528,34 @@
   } else if (!settings.searchEngine) {
     settings.searchEngine = 'google';
   }
+  if (!['dark','dusk','forest','ocean'].includes(settings.theme)) settings.theme = 'dark';
+  if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
+  renderProfiles();
+  document.getElementById('profile-switch').addEventListener('change', function() {
+    activeProfileId = this.value;
+    applyProfile();
+  });
+  const profileOverlay = document.getElementById('profile-overlay');
+  document.getElementById('new-profile').addEventListener('click', function() {
+    document.getElementById('profile-name').value = '';
+    document.getElementById('profile-emoji').value = '';
+    profileOverlay.classList.add('open');
+  });
+  document.getElementById('profile-close').addEventListener('click', () => profileOverlay.classList.remove('open'));
+  document.getElementById('profile-save').addEventListener('click', function() {
+    const name = document.getElementById('profile-name').value.trim();
+    const emoji = document.getElementById('profile-emoji').value.trim() || '📚';
+    if (!name) return;
+    const id = 'p_' + Date.now().toString(36);
+    profiles[id] = makeDefaultProfile(name, emoji);
+    activeProfileId = id;
+    persistProfiles();
+    renderProfiles();
+    applyProfile();
+    profileOverlay.classList.remove('open');
+  });
+  applyTheme();
+  applyWidgetVisibility();
   applyTheme();
   applyWidgetVisibility();
   applyTheme();
