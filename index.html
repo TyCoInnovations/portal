@@ -435,6 +435,14 @@
     }
 
     .sug-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    #search-history { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; overflow-y: auto; min-height: 0; }
+    .history-empty { font-size: 0.7rem; color: var(--muted); padding: 6px 0; }
+    .history-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px; border-radius: 8px; }
+    .history-query { background: transparent; border: 0; color: var(--muted); font-family: var(--f); font-size: 0.75rem; cursor: pointer; text-align: left; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item:hover .history-query { color: var(--text); }
+    .history-remove { width: 18px; height: 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--s2); color: var(--muted); font-size: 0.66rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.12s, color 0.12s, border-color 0.12s; }
+    .history-item:hover .history-remove { opacity: 1; }
+    .history-remove:hover { color: #f87171; border-color: rgba(248,113,113,0.4); }
 
     /* ── Widgets card ── */
     #widgets-card {
@@ -643,6 +651,7 @@
         <button class="stag" data-q="entertainment news">Entertainment</button>
       </div>
       <div id="suggestions" role="listbox" aria-label="Search suggestions"></div>
+      <div id="search-history" aria-label="Search history"></div>
     </div>
 
     <!-- Widgets -->
@@ -785,6 +794,7 @@
       <div class="settings-row"><label>Your name</label><input id="settings-name" class="mfield" type="text" maxlength="40" placeholder="Display name"></div>
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
       <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
+      <div class="settings-row"><label>Search history</label><input id="search-history-enabled" type="checkbox" checked></div>
       <button class="mbtn" id="save-settings">Save settings</button>
     </div>
   </div>
@@ -938,7 +948,7 @@
       emoji: emoji || '📚',
       bookmarks: DEFAULTS.map(b => ({ ...b })),
       icons: {},
-      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' }
+      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true }
     };
   }
   function loadProfiles() {
@@ -962,7 +972,7 @@
   let bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
   let editingIndex = -1;
   let dragIndex = -1;
-  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google' };
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true };
   let isEditMode = false;
   let bookmarkIcons = { ...(currentProfile().icons || {}) };
   let settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
@@ -976,6 +986,7 @@
     applyTheme();
     applyWidgetVisibility();
     refreshSearchPlaceholder();
+    renderSearchHistory();
     renderBM();
     const sw = document.getElementById('profile-switch');
     if (sw) sw.value = activeProfileId;
@@ -1293,6 +1304,15 @@
     const base = engines[settings.searchEngine] || engines.google;
     window.open(base + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
   }
+  function getSearchHistory() { return Array.isArray(currentProfile().searchHistory) ? currentProfile().searchHistory : []; }
+  function setSearchHistory(items) { currentProfile().searchHistory = items.slice(0, 10); persistProfiles(); }
+  function pushSearchHistory(q) {
+    if (!settings.searchHistoryEnabled) return;
+    const trimmed = String(q || '').trim();
+    if (!trimmed) return;
+    const next = [trimmed].concat(getSearchHistory().filter(item => item.toLowerCase() !== trimmed.toLowerCase())).slice(0, 10);
+    setSearchHistory(next);
+  }
 
   function getSearchEngineLabel() {
     const labels = { google: 'Google', bing: 'Bing', duckduckgo: 'DuckDuckGo', startpage: 'Startpage' };
@@ -1311,15 +1331,40 @@
 
   const searchInput = document.getElementById('search-input');
   const suggestEl   = document.getElementById('suggestions');
+  const historyEl   = document.getElementById('search-history');
+  function renderSearchHistory() {
+    if (!settings.searchHistoryEnabled) { historyEl.style.display = 'none'; historyEl.innerHTML = ''; return; }
+    if (searchInput.value.trim()) { historyEl.style.display = 'none'; return; }
+    const items = getSearchHistory();
+    historyEl.style.display = 'block';
+    if (!items.length) { historyEl.innerHTML = '<div class="history-empty">Your recent searches will appear here.</div>'; return; }
+    historyEl.innerHTML = items.map(function(item, idx) {
+      const safe = item.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      return '<div class="history-item"><button class="history-query" data-q="' + safe + '">' + safe + '</button><button class="history-remove" data-index="' + idx + '" aria-label="Remove search">✕</button></div>';
+    }).join('');
+    historyEl.querySelectorAll('.history-query').forEach(function(btn) {
+      btn.addEventListener('click', function() { const q = this.dataset.q || ''; if (!q) return; searchFor(q); pushSearchHistory(q); renderSearchHistory(); });
+    });
+    historyEl.querySelectorAll('.history-remove').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const items = getSearchHistory();
+        items.splice(Number(this.dataset.index), 1);
+        setSearchHistory(items);
+        renderSearchHistory();
+      });
+    });
+  }
 
   searchInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
       const q = searchInput.value.trim();
-      if (q) { searchFor(q); searchInput.value = ''; suggestEl.style.display = 'none'; }
+      if (q) { searchFor(q); pushSearchHistory(q); searchInput.value = ''; suggestEl.style.display = 'none'; renderSearchHistory(); }
     }
     if (e.key === 'Escape') {
+      searchInput.value = '';
       suggestEl.style.display = 'none';
       suggestEl.innerHTML = '';
+      renderSearchHistory();
     }
   });
 
@@ -1330,6 +1375,7 @@
 
   searchInput.addEventListener('input', function() {
     const v = this.value.trim().toLowerCase();
+    renderSearchHistory();
     if (!v) { suggestEl.style.display = 'none'; suggestEl.innerHTML = ''; return; }
     const hits = SUGGESTIONS.filter(s => s.toLowerCase().includes(v));
     if (!hits.length) { suggestEl.style.display = 'none'; suggestEl.innerHTML = ''; return; }
@@ -1341,9 +1387,11 @@
     suggestEl.querySelectorAll('.sug-item').forEach(function(el) {
       el.addEventListener('click', function() {
         searchFor(el.textContent.replace('🔍 ', '').trim());
+        pushSearchHistory(el.textContent.replace('🔍 ', '').trim());
         searchInput.value = '';
         suggestEl.style.display = 'none';
         suggestEl.innerHTML = '';
+        renderSearchHistory();
       });
     });
   });
@@ -1363,6 +1411,7 @@
     document.getElementById('settings-name').value = lsGet(NAME_KEY) || '';
     document.getElementById('show-weather').checked = settings.showWeather;
     document.getElementById('show-stocks').checked = settings.showStocks;
+    document.getElementById('search-history-enabled').checked = settings.searchHistoryEnabled !== false;
     settingsOverlay.classList.add('open');
   });
   document.getElementById('settings-close').addEventListener('click', () => settingsOverlay.classList.remove('open'));
@@ -1372,12 +1421,14 @@
     settings.searchEngine = document.getElementById('search-engine').value;
     settings.showWeather = document.getElementById('show-weather').checked;
     settings.showStocks = document.getElementById('show-stocks').checked;
+    settings.searchHistoryEnabled = document.getElementById('search-history-enabled').checked;
     const updatedName = document.getElementById('settings-name').value.trim();
     if (updatedName) { lsSet(NAME_KEY, updatedName); applyName(updatedName); }
     setCookie('tyco_search_engine', settings.searchEngine, 365);
     saveSettings();
     applyTheme();
     applyWidgetVisibility();
+    renderSearchHistory();
     renderBM();
     settingsOverlay.classList.remove('open');
   });
@@ -1408,6 +1459,7 @@
   }
   if (!['dark','dusk','forest','ocean'].includes(settings.theme)) settings.theme = 'dark';
   if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
+  if (typeof settings.searchHistoryEnabled !== 'boolean') settings.searchHistoryEnabled = true;
   renderProfiles();
   document.getElementById('profile-switch').addEventListener('change', function() {
     activeProfileId = this.value;
@@ -1466,6 +1518,7 @@
   applyTheme();
   applyWidgetVisibility();
   refreshSearchPlaceholder();
+  renderSearchHistory();
   renderBM();
   initName();
   </script>
