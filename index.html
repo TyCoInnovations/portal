@@ -119,6 +119,10 @@
       height: calc(100vh - 49px);
       overflow: hidden;
     }
+    main.no-widgets {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
 
     /* ── Cards ── */
     .card {
@@ -760,8 +764,11 @@
         <button class="modal-x" id="profile-close" aria-label="Close">✕</button>
       </div>
       <input class="mfield" id="profile-name" type="text" placeholder="Profile name (e.g. Work)">
-      <input class="mfield" id="profile-emoji" type="text" placeholder="Emoji icon (e.g. 💼)" maxlength="2">
+      <input class="mfield" id="profile-emoji" list="emoji-options" type="text" placeholder="Emoji icon (e.g. 💼)" maxlength="2">
+      <datalist id="emoji-options"><option value="🏠"><option value="💼"><option value="🎮"><option value="📚"><option value="🎬"><option value="🛒"><option value="💡"><option value="🧪"><option value="✈️"><option value="🎵"></datalist>
       <button class="mbtn" id="profile-save">Create profile</button>
+      <button class="mbtn" id="profile-update" style="background:#3b82f6;color:#fff;display:none;">Save profile changes</button>
+      <button class="mbtn" id="profile-delete" style="background:#ef4444;color:#fff;display:none;">Delete profile</button>
     </div>
   </div>
 
@@ -775,6 +782,7 @@
       <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
+      <div class="settings-row"><label>Your name</label><input id="settings-name" class="mfield" type="text" maxlength="40" placeholder="Display name"></div>
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
       <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
       <button class="mbtn" id="save-settings">Save settings</button>
@@ -967,6 +975,7 @@
     settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
     applyTheme();
     applyWidgetVisibility();
+    refreshSearchPlaceholder();
     renderBM();
     const sw = document.getElementById('profile-switch');
     if (sw) sw.value = activeProfileId;
@@ -1285,6 +1294,14 @@
     window.open(base + encodeURIComponent(q), '_blank', 'noopener,noreferrer');
   }
 
+  function getSearchEngineLabel() {
+    const labels = { google: 'Google', bing: 'Bing', duckduckgo: 'DuckDuckGo', startpage: 'Startpage' };
+    return labels[settings.searchEngine] || 'Google';
+  }
+  function refreshSearchPlaceholder() {
+    searchInput.placeholder = 'Search with ' + getSearchEngineLabel() + '…';
+  }
+
   // tag buttons
   document.querySelectorAll('.stag').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -1343,6 +1360,7 @@
     document.getElementById('theme-select').value = settings.theme;
     document.getElementById('style-select').value = settings.bookmarkStyle;
     document.getElementById('search-engine').value = settings.searchEngine || 'google';
+    document.getElementById('settings-name').value = lsGet(NAME_KEY) || '';
     document.getElementById('show-weather').checked = settings.showWeather;
     document.getElementById('show-stocks').checked = settings.showStocks;
     settingsOverlay.classList.add('open');
@@ -1354,6 +1372,8 @@
     settings.searchEngine = document.getElementById('search-engine').value;
     settings.showWeather = document.getElementById('show-weather').checked;
     settings.showStocks = document.getElementById('show-stocks').checked;
+    const updatedName = document.getElementById('settings-name').value.trim();
+    if (updatedName) { lsSet(NAME_KEY, updatedName); applyName(updatedName); }
     setCookie('tyco_search_engine', settings.searchEngine, 365);
     saveSettings();
     applyTheme();
@@ -1373,9 +1393,12 @@
     const weather = document.getElementById('wbox-weather');
     const stocks = document.getElementById('wbox-stocks');
     const widgetsCard = document.getElementById('widgets-card');
+    const main = document.querySelector('main');
     weather.style.display = settings.showWeather ? '' : 'none';
     stocks.style.display = settings.showStocks ? '' : 'none';
     widgetsCard.style.display = (!settings.showWeather && !settings.showStocks) ? 'none' : 'flex';
+    if (!settings.showWeather && !settings.showStocks) main.classList.add('no-widgets');
+    else main.classList.remove('no-widgets');
   }
   const cookieSearchEngine = getCookie('tyco_search_engine');
   if (cookieSearchEngine && ['google','bing','duckduckgo','startpage'].includes(cookieSearchEngine)) {
@@ -1391,15 +1414,27 @@
     applyProfile();
   });
   const profileOverlay = document.getElementById('profile-overlay');
-  document.getElementById('new-profile').addEventListener('click', function() {
-    document.getElementById('profile-name').value = '';
-    document.getElementById('profile-emoji').value = '';
+  const profileNameInput = document.getElementById('profile-name');
+  const profileEmojiInput = document.getElementById('profile-emoji');
+  const profileSaveBtn = document.getElementById('profile-save');
+  const profileUpdateBtn = document.getElementById('profile-update');
+  const profileDeleteBtn = document.getElementById('profile-delete');
+  function openProfileModal(mode) {
+    profileNameInput.value = mode === 'edit' ? (currentProfile().name || '') : '';
+    profileEmojiInput.value = mode === 'edit' ? (currentProfile().emoji || '📚') : '';
+    profileSaveBtn.style.display = mode === 'create' ? '' : 'none';
+    profileUpdateBtn.style.display = mode === 'edit' ? '' : 'none';
+    profileDeleteBtn.style.display = mode === 'edit' ? '' : 'none';
+    profileDeleteBtn.disabled = Object.keys(profiles).length <= 1;
+    profileDeleteBtn.textContent = profileDeleteBtn.disabled ? 'Cannot delete last profile' : 'Delete profile';
     profileOverlay.classList.add('open');
-  });
+  }
+  document.getElementById('new-profile').addEventListener('click', function() { openProfileModal('create'); });
+  document.getElementById('profile-switch').addEventListener('dblclick', function() { openProfileModal('edit'); });
   document.getElementById('profile-close').addEventListener('click', () => profileOverlay.classList.remove('open'));
-  document.getElementById('profile-save').addEventListener('click', function() {
-    const name = document.getElementById('profile-name').value.trim();
-    const emoji = document.getElementById('profile-emoji').value.trim() || '📚';
+  profileSaveBtn.addEventListener('click', function() {
+    const name = profileNameInput.value.trim();
+    const emoji = profileEmojiInput.value.trim() || '📚';
     if (!name) return;
     const id = 'p_' + Date.now().toString(36);
     profiles[id] = makeDefaultProfile(name, emoji);
@@ -1409,8 +1444,28 @@
     applyProfile();
     profileOverlay.classList.remove('open');
   });
+  profileUpdateBtn.addEventListener('click', function() {
+    const name = profileNameInput.value.trim();
+    const emoji = profileEmojiInput.value.trim() || '📚';
+    if (!name) return;
+    profiles[activeProfileId].name = name;
+    profiles[activeProfileId].emoji = emoji;
+    persistProfiles();
+    renderProfiles();
+    profileOverlay.classList.remove('open');
+  });
+  profileDeleteBtn.addEventListener('click', function() {
+    if (Object.keys(profiles).length <= 1) return;
+    delete profiles[activeProfileId];
+    activeProfileId = Object.keys(profiles)[0];
+    persistProfiles();
+    renderProfiles();
+    applyProfile();
+    profileOverlay.classList.remove('open');
+  });
   applyTheme();
   applyWidgetVisibility();
+  refreshSearchPlaceholder();
   renderBM();
   initName();
   </script>
