@@ -788,7 +788,7 @@
         <div class="modal-title">Settings</div>
         <button class="modal-x" id="settings-close" aria-label="Close">✕</button>
       </div>
-      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option></select></div>
+      <div class="settings-row"><label>Theme</label><select id="theme-select" class="mfield"><option value="dark">Midnight</option><option value="dusk">Dusk</option><option value="forest">Forest</option><option value="ocean">Ocean</option><option value="crimson">Crimson</option></select></div>
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
       <div class="settings-row"><label>Your name</label><input id="settings-name" class="mfield" type="text" maxlength="40" placeholder="Display name"></div>
@@ -1001,7 +1001,8 @@
       dark:    { bg:'#0d0f14', surface:'#141720', s2:'#1c2030', text:'#e8eaf0', muted:'#6b7385', border:'rgba(255,255,255,0.07)' },
       dusk:    { bg:'#12131c', surface:'#1a1d2b', s2:'#23283a', text:'#e8ebff', muted:'#939aba', border:'rgba(179,166,255,0.16)' },
       forest:  { bg:'#0f1615', surface:'#162321', s2:'#1f2f2c', text:'#e8f3ef', muted:'#89a49d', border:'rgba(99,179,147,0.2)' },
-      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' }
+      ocean:   { bg:'#0f1724', surface:'#152238', s2:'#1d2d47', text:'#e5efff', muted:'#8ea4c8', border:'rgba(120,168,255,0.2)' },
+      crimson: { bg:'#1a0f11', surface:'#281417', s2:'#341b1d', text:'#ffece8', muted:'#d7a29a', border:'rgba(255,122,89,0.24)' }
     }[settings.theme] || null;
     if (!t) return;
     document.documentElement.style.setProperty('--bg', t.bg);
@@ -1457,7 +1458,7 @@
   } else if (!settings.searchEngine) {
     settings.searchEngine = 'google';
   }
-  if (!['dark','dusk','forest','ocean'].includes(settings.theme)) settings.theme = 'dark';
+  if (!['dark','dusk','forest','ocean','crimson'].includes(settings.theme)) settings.theme = 'dark';
   if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
   if (typeof settings.searchHistoryEnabled !== 'boolean') settings.searchHistoryEnabled = true;
   renderProfiles();
