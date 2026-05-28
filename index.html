@@ -652,11 +652,19 @@
       </div>
       <div id="suggestions" role="listbox" aria-label="Search suggestions"></div>
       <div id="search-history" aria-label="Search history"></div>
+      <button class="mbtn" id="ai-mode-toggle" style="margin-top:10px;">AI Mode</button>
+      <div id="ai-panel" style="display:none;margin-top:10px;">
+        <div id="ai-log" style="height:120px;overflow:auto;border:1px solid var(--border);padding:8px;border-radius:8px;margin-bottom:8px;font-size:.75rem;"></div>
+        <input id="ai-input" class="mfield" type="text" placeholder="Ask AI or run /addbookmark name|url|icon">
+        <button class="mbtn" id="ai-send">Send</button>
+      </div>
     </div>
 
-    <!-- Widgets -->
+    <!-- Utilities -->
     <div class="card" id="widgets-card">
-      <div class="card-label">Widgets</div>
+      <div class="card-label">Utilities</div>
+
+      <div class="wbox" id="wbox-photos"><div id="photos-content"><p>Connect a cloud service then add image URLs for quick photo moments.</p></div></div>
 
       <!-- Weather -->
       <div class="wbox" id="wbox-weather">
@@ -688,48 +696,6 @@
         </div>
       </div>
 
-      <!-- Stocks (TradingView) -->
-      <div class="wbox" id="wbox-stocks">
-        <div class="tv-wrap">
-          <div class="tradingview-widget-container" style="height:100%;width:100%;">
-            <div class="tradingview-widget-container__widget" style="height:100%;width:100%;"></div>
-            <script type="text/javascript"
-              src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js"
-              async>
-            {
-              "symbols": [
-                ["Apple","AAPL|1D"],
-                ["Google","GOOGL|1D"],
-                ["Microsoft","MSFT|1D"],
-                ["Bitcoin","BITSTAMP:BTCUSD|1D"],
-                ["Tesla","NASDAQ:TSLA|1D"],
-                ["McDonald's","NYSE:MCD|1D"]
-              ],
-              "chartOnly": false,
-              "width": "100%",
-              "height": "100%",
-              "locale": "en",
-              "colorTheme": "dark",
-              "autosize": true,
-              "showVolume": false,
-              "showMA": false,
-              "hideDateRanges": false,
-              "hideMarketStatus": false,
-              "hideSymbolLogo": false,
-              "scalePosition": "right",
-              "scaleMode": "Normal",
-              "fontFamily": "Outfit, -apple-system, sans-serif",
-              "fontSize": "10",
-              "noTimeScale": false,
-              "valuesTracking": "1",
-              "changeMode": "price-and-percent",
-              "chartType": "area",
-              "lineWidth": 2,
-              "lineType": 0
-            }
-            </script>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -792,8 +758,11 @@
       <div class="settings-row"><label>Bookmark style</label><select id="style-select" class="mfield"><option value="rounded">Rounded</option><option value="square">Square</option><option value="tab">Tab</option><option value="pill">Pill</option></select></div>
       <div class="settings-row"><label>Search engine</label><select id="search-engine" class="mfield"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option><option value="startpage">Startpage</option></select></div>
       <div class="settings-row"><label>Your name</label><input id="settings-name" class="mfield" type="text" maxlength="40" placeholder="Display name"></div>
-      <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
-      <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
+      <div class="settings-row"><label>Show weather</label><input id="show-weather" type="checkbox" checked></div>
+      <div class="settings-row"><label>Break interval (min)</label><input id="break-interval" type="number" min="10" max="120" value="25"></div>
+      <div class="settings-row"><label>Cloud provider</label><select id="cloud-provider" class="mfield"><option value="none">None</option><option value="dropbox">Dropbox</option><option value="gdrive">Google Drive</option><option value="icloud">iCloud</option></select></div>
+      <div class="settings-row"><label>Cloud folder/path</label><input id="cloud-path" class="mfield" type="text" placeholder="/TyCoBookmarks/profile.json"></div>
+      <div class="settings-row"><label>Enable AI mode</label><input id="ai-enabled" type="checkbox"></div>
       <div class="settings-row"><label>Search history</label><input id="search-history-enabled" type="checkbox" checked></div>
       <button class="mbtn" id="save-settings">Save settings</button>
     </div>
@@ -948,7 +917,7 @@
       emoji: emoji || '📚',
       bookmarks: DEFAULTS.map(b => ({ ...b })),
       icons: {},
-      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true }
+      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, searchEngine: 'google', searchHistoryEnabled: true, breakInterval: 25, cloudProvider: 'none', cloudPath: '', aiEnabled: false }
     };
   }
   function loadProfiles() {
@@ -972,7 +941,7 @@
   let bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
   let editingIndex = -1;
   let dragIndex = -1;
-  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true };
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, searchEngine: 'google', searchHistoryEnabled: true, breakInterval: 25, cloudProvider: 'none', cloudPath: '', aiEnabled: false };
   let isEditMode = false;
   let bookmarkIcons = { ...(currentProfile().icons || {}) };
   let settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
@@ -1410,7 +1379,10 @@
     document.getElementById('search-engine').value = settings.searchEngine || 'google';
     document.getElementById('settings-name').value = lsGet(NAME_KEY) || '';
     document.getElementById('show-weather').checked = settings.showWeather;
-    document.getElementById('show-stocks').checked = settings.showStocks;
+    document.getElementById('break-interval').value = settings.breakInterval || 25;
+    document.getElementById('cloud-provider').value = settings.cloudProvider || 'none';
+    document.getElementById('cloud-path').value = settings.cloudPath || '';
+    document.getElementById('ai-enabled').checked = !!settings.aiEnabled;
     document.getElementById('search-history-enabled').checked = settings.searchHistoryEnabled !== false;
     settingsOverlay.classList.add('open');
   });
@@ -1420,7 +1392,10 @@
     settings.bookmarkStyle = document.getElementById('style-select').value;
     settings.searchEngine = document.getElementById('search-engine').value;
     settings.showWeather = document.getElementById('show-weather').checked;
-    settings.showStocks = document.getElementById('show-stocks').checked;
+    settings.breakInterval = Math.max(10, Math.min(120, Number(document.getElementById('break-interval').value || 25)));
+    settings.cloudProvider = document.getElementById('cloud-provider').value;
+    settings.cloudPath = document.getElementById('cloud-path').value.trim();
+    settings.aiEnabled = document.getElementById('ai-enabled').checked;
     settings.searchHistoryEnabled = document.getElementById('search-history-enabled').checked;
     const updatedName = document.getElementById('settings-name').value.trim();
     if (updatedName) { lsSet(NAME_KEY, updatedName); applyName(updatedName); }
@@ -1442,14 +1417,13 @@
   // ── Kick off ─────────────────────────────────────────────────────
   function applyWidgetVisibility() {
     const weather = document.getElementById('wbox-weather');
-    const stocks = document.getElementById('wbox-stocks');
+    const photos = document.getElementById('wbox-photos');
     const widgetsCard = document.getElementById('widgets-card');
     const main = document.querySelector('main');
     weather.style.display = settings.showWeather ? '' : 'none';
-    stocks.style.display = settings.showStocks ? '' : 'none';
-    widgetsCard.style.display = (!settings.showWeather && !settings.showStocks) ? 'none' : 'flex';
-    if (!settings.showWeather && !settings.showStocks) main.classList.add('no-widgets');
-    else main.classList.remove('no-widgets');
+    photos.style.display = '';
+    widgetsCard.style.display = '';
+    main.classList.remove('no-widgets');
   }
   const cookieSearchEngine = getCookie('tyco_search_engine');
   if (cookieSearchEngine && ['google','bing','duckduckgo','startpage'].includes(cookieSearchEngine)) {
@@ -1521,6 +1495,46 @@
   renderSearchHistory();
   renderBM();
   initName();
-  </script>
+  
+  // TyCo 2.1 additions
+  const aiToggle=document.getElementById('ai-mode-toggle');
+  const aiPanel=document.getElementById('ai-panel');
+  const aiLog=document.getElementById('ai-log');
+  const aiInput=document.getElementById('ai-input');
+  function aiPrint(t){ aiLog.innerHTML += '<div>'+t+'</div>'; aiLog.scrollTop=aiLog.scrollHeight; }
+  aiToggle.addEventListener('click',()=>{ if(!settings.aiEnabled){alert('Enable AI Mode in settings first.');return;} aiPanel.style.display=aiPanel.style.display==='none'?'block':'none'; });
+  document.getElementById('ai-send').addEventListener('click',()=>{
+    const msg=(aiInput.value||'').trim(); if(!msg) return;
+    aiPrint('You: '+msg);
+    if(msg.startsWith('/addbookmark ')){
+      const raw=msg.replace('/addbookmark ',''); const [name,url,icon]=raw.split('|').map(v=>(v||'').trim());
+      if(name&&url&&confirm('Allow AI to add bookmark "'+name+'"?')){ bookmarks.push({name,url:normaliseUrl(url)}); if(icon) bookmarkIcons[normaliseUrl(url)] = icon; saveBM(); saveIcons(); renderBM(); aiPrint('AI: Added bookmark.'); }
+      else aiPrint('AI: Command cancelled or invalid. Format: /addbookmark name|url|iconUrl(optional)');
+    } else if(msg.startsWith('/removebookmark ')){
+      const name=msg.replace('/removebookmark ','').trim().toLowerCase();
+      const i=bookmarks.findIndex(b=>b.name.toLowerCase()===name);
+      if(i>-1 && confirm('Allow AI to remove '+bookmarks[i].name+'?')){ delete bookmarkIcons[bookmarks[i].url]; bookmarks.splice(i,1); saveBM(); saveIcons(); renderBM(); aiPrint('AI: Removed bookmark.'); }
+    } else { aiPrint('AI: Demo mode. Commands: /addbookmark name|url|iconUrl(optional), /removebookmark name'); }
+    aiInput.value='';
+  });
+  // focus timer + brain break
+  let focusLeft=0,focusInt=null,breakInt=null;
+  const searchCard=document.getElementById('search-card');
+  const timer=document.createElement('div'); timer.style.marginTop='10px';
+  timer.innerHTML='<button class="mbtn" id="focus-start">Start 25m Focus</button><span id="focus-status" style="margin-left:8px;font-size:.8rem;color:var(--muted)"></span>';
+  searchCard.appendChild(timer);
+  function tickFocus(){ const m=Math.floor(focusLeft/60),s=focusLeft%60; document.getElementById('focus-status').textContent=focusLeft>0?`Focus ${m}:${String(s).padStart(2,'0')}`:'Done ✅'; if(focusLeft<=0){clearInterval(focusInt);return;} focusLeft--; }
+  document.getElementById('focus-start').addEventListener('click',()=>{ focusLeft=25*60; clearInterval(focusInt); focusInt=setInterval(tickFocus,1000); tickFocus(); });
+  function startBreakReminders(){ clearInterval(breakInt); breakInt=setInterval(()=>{ alert('🧠 Brain break: take a short mindful pause. Try box breathing for 60 seconds.'); }, (settings.breakInterval||25)*60*1000); }
+  startBreakReminders();
+  // cloud/photos/integrations/extension bridge
+  const photosContent=document.getElementById('photos-content');
+  photosContent.innerHTML='<p><strong>Cloud:</strong> '+(settings.cloudProvider||'none')+' '+(settings.cloudPath||'')+'</p><input id="photo-url" class="mfield" placeholder="Photo URL"><button class="mbtn" id="add-photo">Add photo</button><div id="photo-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;"></div><p style="font-size:.72rem;color:var(--muted);margin-top:6px;">Integrations: <a target="_blank" href="https://music.apple.com">Apple Music</a> • <a target="_blank" href="https://www.dropbox.com">Dropbox</a></p>';
+  const photoList=document.getElementById('photo-list'); const photoKey='_photos_v1'; const photos=JSON.parse(lsGet(photoKey)||'[]'); function renderPhotos(){ photoList.innerHTML=photos.map(u=>`<img src="${u}" style="width:100%;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"/>`).join(''); } renderPhotos();
+  document.getElementById('add-photo').addEventListener('click',()=>{const u=document.getElementById('photo-url').value.trim(); if(!u)return; photos.unshift(u); lsSet(photoKey,JSON.stringify(photos.slice(0,12))); renderPhotos();});
+  window.addEventListener('message',(e)=>{ const d=e.data||{}; if(d.type==='TYCO_IMPORT_BOOKMARKS' && Array.isArray(d.bookmarks)){ if(confirm('Import bookmarks from extension?')){ bookmarks=d.bookmarks; saveBM(); renderBM(); } } });
+  window.tycoExportBookmarks=()=>({bookmarks});
+  document.getElementById('save-settings').addEventListener('click', startBreakReminders);
+</script>
 </body>
 </html>
