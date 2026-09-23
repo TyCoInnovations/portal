@@ -795,6 +795,7 @@
       <div class="settings-row"><label>Show Weather Widget</label><input id="show-weather" type="checkbox"></div>
       <div class="settings-row"><label>Show Stocks Widget</label><input id="show-stocks" type="checkbox" checked></div>
       <div class="settings-row"><label>Search history</label><input id="search-history-enabled" type="checkbox" checked></div>
+      <div class="settings-row"><label>Language</label><select id="language-select" class="mfield"><option value="en-AU">English (Australia)</option><option value="en-GB">English (UK)</option></select></div>
       <button class="mbtn" id="save-settings">Save settings</button>
     </div>
   </div>
@@ -865,6 +866,7 @@
 
   function getGreeting() {
     const h = new Date().getHours();
+    if (settings.language === 'en-GB') return "Top o' the morning to you";
     if (h < 12) return 'Good morning';
     if (h < 18) return 'Good afternoon';
     return 'Good evening';
@@ -948,7 +950,7 @@
       emoji: emoji || '📚',
       bookmarks: DEFAULTS.map(b => ({ ...b })),
       icons: {},
-      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true }
+      settings: { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true, language: 'en-AU' }
     };
   }
   function loadProfiles() {
@@ -972,7 +974,7 @@
   let bookmarks = (currentProfile().bookmarks || DEFAULTS.map(b => ({ ...b }))).map(b => ({...b}));
   let editingIndex = -1;
   let dragIndex = -1;
-  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true };
+  const defaultSettings = { theme: 'dark', bookmarkStyle: 'rounded', showWeather: true, showStocks: true, searchEngine: 'google', searchHistoryEnabled: true, language: 'en-AU' };
   let isEditMode = false;
   let bookmarkIcons = { ...(currentProfile().icons || {}) };
   let settings = { ...defaultSettings, ...(currentProfile().settings || {}) };
@@ -1369,16 +1371,23 @@
     }
   });
 
-  const SUGGESTIONS = [
+  const SUGGESTIONS_BASE = [
     'Weather today', 'News headlines', 'Trending topics',
     'Popular searches', 'Tech news', 'Local events', 'Entertainment'
   ];
+  const SUGGESTIONS_UK = ['Where to buy tea'];
+
+  function getSuggestions() {
+    return settings.language === 'en-GB'
+      ? SUGGESTIONS_BASE.concat(SUGGESTIONS_UK)
+      : SUGGESTIONS_BASE;
+  }
 
   searchInput.addEventListener('input', function() {
     const v = this.value.trim().toLowerCase();
     renderSearchHistory();
     if (!v) { suggestEl.style.display = 'none'; suggestEl.innerHTML = ''; return; }
-    const hits = SUGGESTIONS.filter(s => s.toLowerCase().includes(v));
+    const hits = getSuggestions().filter(s => s.toLowerCase().includes(v));
     if (!hits.length) { suggestEl.style.display = 'none'; suggestEl.innerHTML = ''; return; }
     suggestEl.style.display = 'block';
     suggestEl.innerHTML = hits.map(function(s) {
@@ -1413,6 +1422,7 @@
     document.getElementById('show-weather').checked = settings.showWeather;
     document.getElementById('show-stocks').checked = settings.showStocks;
     document.getElementById('search-history-enabled').checked = settings.searchHistoryEnabled !== false;
+    document.getElementById('language-select').value = settings.language || 'en-AU';
     settingsOverlay.classList.add('open');
   });
   document.getElementById('settings-close').addEventListener('click', () => settingsOverlay.classList.remove('open'));
@@ -1423,12 +1433,14 @@
     settings.showWeather = document.getElementById('show-weather').checked;
     settings.showStocks = document.getElementById('show-stocks').checked;
     settings.searchHistoryEnabled = document.getElementById('search-history-enabled').checked;
+    settings.language = document.getElementById('language-select').value || 'en-AU';
     const updatedName = document.getElementById('settings-name').value.trim();
     if (updatedName) { lsSet(NAME_KEY, updatedName); applyName(updatedName); }
     setCookie('tyco_search_engine', settings.searchEngine, 365);
     saveSettings();
     applyTheme();
     applyWidgetVisibility();
+    applyLanguage();
     renderSearchHistory();
     renderBM();
     settingsOverlay.classList.remove('open');
@@ -1439,6 +1451,15 @@
     this.textContent = isEditMode ? 'Done' : 'Edit';
     renderBM();
   });
+
+  function applyLanguage() {
+    const isUK = settings.language === 'en-GB';
+    document.getElementById('new-profile').textContent = isUK ? '+ Bloke' : '+ Profile';
+    const greetEl = document.getElementById('header-greeting');
+    if (greetEl.childNodes.length) {
+      greetEl.childNodes[0].textContent = getGreeting() + ', ';
+    }
+  }
 
   // ── Kick off ─────────────────────────────────────────────────────
   function applyWidgetVisibility() {
@@ -1461,6 +1482,7 @@
   if (!['dark','dusk','forest','ocean','crimson'].includes(settings.theme)) settings.theme = 'dark';
   if (!['rounded','square','tab','pill'].includes(settings.bookmarkStyle)) settings.bookmarkStyle = 'rounded';
   if (typeof settings.searchHistoryEnabled !== 'boolean') settings.searchHistoryEnabled = true;
+  if (!['en-AU','en-GB'].includes(settings.language)) settings.language = 'en-AU';
   renderProfiles();
   document.getElementById('profile-switch').addEventListener('change', function() {
     activeProfileId = this.value;
@@ -1518,6 +1540,7 @@
   });
   applyTheme();
   applyWidgetVisibility();
+  applyLanguage();
   refreshSearchPlaceholder();
   renderSearchHistory();
   renderBM();
